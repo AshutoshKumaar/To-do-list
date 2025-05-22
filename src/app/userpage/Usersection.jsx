@@ -1,211 +1,196 @@
 'use client';
 import React, { useState } from 'react';
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+
 
 function Usersection() {
   const [tasks, setTasks] = useState([]);
   const [taskInput, setTaskInput] = useState('');
   const [subtaskInput, setSubtaskInput] = useState('');
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(null);
-  const [editTaskIndex, setEditTaskIndex] = useState(null);
-  const [editSubtaskIndex, setEditSubtaskIndex] = useState(null);
-  const [editInput, setEditInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedTasks, setExpandedTasks] = useState({});
 
   const addTask = () => {
-    if (taskInput.trim() === '') return;
-    setTasks([...tasks, { text: taskInput, subtasks: [], done: false }]);
+    if (!taskInput.trim()) return;
+    setTasks([...tasks, { text: taskInput, subtasks: [] }]);
     setTaskInput('');
   };
 
   const addSubtask = (index) => {
-    if (subtaskInput.trim() === '') return;
-    const updatedTasks = [...tasks];
-    updatedTasks[index].subtasks.push({ text: subtaskInput, done: false });
-    setTasks(updatedTasks);
+    if (!subtaskInput.trim()) return;
+    const updated = [...tasks];
+    updated[index].subtasks.push({ text: subtaskInput, done: false });
+    setTasks(updated);
     setSubtaskInput('');
   };
 
-  const toggleTaskDone = (index) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[index].done = !updatedTasks[index].done;
-    setTasks(updatedTasks);
-  };
-
-  const toggleSubtaskDone = (taskIndex, subtaskIndex) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[taskIndex].subtasks[subtaskIndex].done = !updatedTasks[taskIndex].subtasks[subtaskIndex].done;
-    setTasks(updatedTasks);
+  const claimSubtask = (taskIndex, subtaskIndex) => {
+    const updated = [...tasks];
+    updated[taskIndex].subtasks[subtaskIndex].done = true;
+    setTasks(updated);
   };
 
   const deleteTask = (index) => {
-    const updatedTasks = tasks.filter((_, i) => i !== index);
-    setTasks(updatedTasks);
-    if (selectedTaskIndex === index) setSelectedTaskIndex(null);
+    const updated = tasks.filter((_, i) => i !== index);
+    setTasks(updated);
   };
 
   const deleteSubtask = (taskIndex, subtaskIndex) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[taskIndex].subtasks = updatedTasks[taskIndex].subtasks.filter((_, i) => i !== subtaskIndex);
-    setTasks(updatedTasks);
+    const updated = [...tasks];
+    updated[taskIndex].subtasks = updated[taskIndex].subtasks.filter((_, i) => i !== subtaskIndex);
+    setTasks(updated);
   };
 
-  const startEditing = (index, isSubtask = false, subtaskIndex = null) => {
-    setEditInput(
-      isSubtask ? tasks[index].subtasks[subtaskIndex].text : tasks[index].text
-    );
-    setEditTaskIndex(index);
-    if (isSubtask) {
-      setEditSubtaskIndex(subtaskIndex);
-    } else {
-      setEditSubtaskIndex(null);
-    }
+  const getProgress = (task) => {
+    const total = task.subtasks.length;
+    const done = task.subtasks.filter(s => s.done).length;
+    return total ? Math.round((done / total) * 100) : 0;
   };
 
-  const saveEdit = () => {
-    const updatedTasks = [...tasks];
-    if (editSubtaskIndex !== null) {
-      updatedTasks[editTaskIndex].subtasks[editSubtaskIndex].text = editInput;
-    } else {
-      updatedTasks[editTaskIndex].text = editInput;
-    }
-    setTasks(updatedTasks);
-    setEditTaskIndex(null);
-    setEditSubtaskIndex(null);
-    setEditInput('');
+  const toggleSubtasks = (index) => {
+    setExpandedTasks((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
   };
+
+  const filteredTasks = tasks.filter(task =>
+    task.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900 text-white px-6 py-10 font-sans">
-      <div className="max-w-2xl mx-auto bg-white/10 backdrop-blur-sm rounded-2xl p-6 shadow-2xl">
-        <h1 className="text-4xl font-bold text-center mb-6">📝 To-Do List</h1>
+    <div className="min-h-screen bg-gradient-to-tr from-indigo-500 via-blue-600 to-purple-600 text-white px-4 py-10 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl">
+        <h1 className="text-4xl font-bold text-center mb-8 drop-shadow-sm">📋 To-Do Tracker</h1>
 
-        {/* Task Input */}
-        <div className="flex gap-3 mb-4">
+        {/* Add Task Input */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <input
             type="text"
             value={taskInput}
             onChange={(e) => setTaskInput(e.target.value)}
-            placeholder="Add a new task..."
-            className="flex-1 p-2 rounded-md text-black"
+            placeholder="Type your main task..."
+            className="flex-1 px-4 py-2 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 transition"
           />
           <button
             onClick={addTask}
-            className="px-4 py-2 bg-white text-blue-700 rounded-md font-medium hover:bg-blue-100"
+            className="bg-cyan-300 hover:bg-cyan-400 text-blue-900 font-medium px-4 py-2 rounded-md transition shadow-md"
           >
             Add Task
           </button>
         </div>
 
+        {/* Search Tasks */}
+        <div className="mb-6">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tasks..."
+            className="w-full px-4 py-2 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
+          />
+        </div>
+
         {/* Task List */}
-        <ul className="space-y-4">
-          {tasks.map((task, index) => (
-            <li
-              key={index}
-              className="p-4 rounded-xl bg-white/20 cursor-pointer hover:bg-blue-700"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <input
-                    type="checkbox"
-                    checked={task.done}
-                    onChange={() => toggleTaskDone(index)}
-                    className="mr-2"
-                  />
-                  {editTaskIndex === index && editSubtaskIndex === null ? (
-                    <input
-                      value={editInput}
-                      onChange={(e) => setEditInput(e.target.value)}
-                      onBlur={saveEdit}
-                      className="text-black px-1 rounded"
-                    />
-                  ) : (
-                    <span
-                      className={`font-semibold text-lg ${
-                        task.done ? 'line-through text-gray-300' : ''
-                      }`}
+        {filteredTasks.length > 0 ? (
+          <ul className="space-y-6">
+            {filteredTasks.map((task, index) => (
+              <li key={index} className="bg-white/20 rounded-xl p-5 shadow-md">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-2 capitalize">{task.text}</h2>
+                    <button
+                      onClick={() => deleteTask(tasks.indexOf(task))}
+                      className="text-red-300 hover:text-red-500 text-sm"
                     >
-                      {task.text}
-                    </span>
-                  )}
+                      Delete
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => toggleSubtasks(index)}
+                    className={`text-white text-xl transition-transform duration-300`}
+                  >
+                   {
+                    expandedTasks[index] ? <FaEyeSlash className='duration-300 ease-in-out' /> : <FaEye  className='duration-300 ease-in-out' /> 
+                   }
+                  </button>
                 </div>
-                <div className="space-x-2">
-                  <button onClick={() => startEditing(index)} className="text-yellow-300 text-sm">Edit</button>
-                  <button onClick={() => deleteTask(index)} className="text-red-400 text-sm">Delete</button>
-                </div>
-              </div>
 
-              {/* Subtasks */}
-              {task.subtasks.length > 0 && (
-                <ul className="ml-6 mt-2 list-disc text-sm text-blue-100 space-y-1">
-                  {task.subtasks.map((subtask, subIndex) => (
-                    <li key={subIndex} className="flex justify-between">
-                      <div>
-                        <input
-                          type="checkbox"
-                          checked={subtask.done}
-                          onChange={() => toggleSubtaskDone(index, subIndex)}
-                          className="mr-2"
-                        />
-                        {editTaskIndex === index &&
-                        editSubtaskIndex === subIndex ? (
-                          <input
-                            value={editInput}
-                            onChange={(e) => setEditInput(e.target.value)}
-                            onBlur={saveEdit}
-                            className="text-black px-1 rounded"
-                          />
-                        ) : (
-                          <span
-                            className={`${
-                              subtask.done ? 'line-through text-gray-300' : ''
-                            }`}
-                          >
-                            {subtask.text}
+                {/* Subtask Section (conditionally shown) */}
+                {expandedTasks[index] && (
+                  <>
+                    {/* Subtasks */}
+                    <ul className="space-y-2 ml-3">
+                      {task.subtasks.map((sub, subIndex) => (
+                        <li
+                          key={subIndex}
+                          className="flex justify-between items-center text-sm"
+                        >
+                          <span className={`capitalize ${sub.done ? 'underline text-slate-100' : ''}`}>
+                            {sub.text}
                           </span>
-                        )}
-                      </div>
-                      <div className="space-x-2 text-xs">
-                        <button
-                          onClick={() =>
-                            startEditing(index, true, subIndex)
-                          }
-                          className="text-yellow-200"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteSubtask(index, subIndex)}
-                          className="text-red-300"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                          <div className="space-x-2">
+                            {!sub.done && (
+                              <button
+                                onClick={() => claimSubtask(tasks.indexOf(task), subIndex)}
+                                className="bg-green-400 hover:bg-green-500 text-xs px-2 py-1 rounded-md transition"
+                              >
+                                Claim
+                              </button>
+                            )}
+                            <button
+                              onClick={() => deleteSubtask(tasks.indexOf(task), subIndex)}
+                              className="text-red-200 text-xs hover:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
 
-              {/* Add Subtask Inline */}
-              <div className="flex mt-3 gap-2">
-                <input
-                  type="text"
-                  value={selectedTaskIndex === index ? subtaskInput : ''}
-                  onChange={(e) => {
-                    setSelectedTaskIndex(index);
-                    setSubtaskInput(e.target.value);
-                  }}
-                  placeholder="Add a subtask..."
-                  className="flex-1 p-1 rounded text-black text-sm"
-                />
-                <button
-                  onClick={() => addSubtask(index)}
-                  className="px-3 py-1 bg-white text-blue-800 text-xs rounded hover:bg-blue-100"
-                >
-                  Add
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                    {/* Add Subtask */}
+                    <div className="flex flex-col sm:flex-row mt-4 gap-2 text-sm">
+                      <input
+                        type="text"
+                        value={selectedTaskIndex === tasks.indexOf(task) ? subtaskInput : ''}
+                        onChange={(e) => {
+                          setSelectedTaskIndex(tasks.indexOf(task));
+                          setSubtaskInput(e.target.value);
+                        }}
+                        placeholder="Type a subtask..."
+                        className="flex-1 px-3 py-1.5 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+                      />
+                      <button
+                        onClick={() => addSubtask(tasks.indexOf(task))}
+                        className="bg-white text-indigo-800 text-xs font-medium px-3 py-1.5 rounded-md hover:bg-gray-100 transition shadow-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-5">
+                      <label className="text-sm font-light">Progress</label>
+                      <div className="relative w-full bg-white/30 rounded-full h-4 mt-1">
+                        <div
+                          className="bg-lime-400 h-4 rounded-full transition-all duration-300"
+                          style={{ width: `${getProgress(task)}%` }}
+                        ></div>
+                        <span className="absolute right-3 top-0.5 text-xs text-white font-light">
+                          {getProgress(task)}% done
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-center text-sm text-white/70 mt-10">No tasks found.</p>
+        )}
       </div>
     </div>
   );
