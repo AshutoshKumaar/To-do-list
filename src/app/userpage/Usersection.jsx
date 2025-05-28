@@ -2,9 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { db } from '../firebase/config';
+import { useRouter } from 'next/navigation';
+import { auth } from '../firebase/config';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, addDoc, getDocs, updateDoc,
-  deleteDoc, doc, setDoc
+  collection, addDoc, updateDoc, deleteDoc, doc, setDoc,
+  onSnapshot, serverTimestamp
 } from 'firebase/firestore';
 
 function Usersection() {
@@ -16,18 +19,38 @@ function Usersection() {
   const [expandedTasks, setExpandedTasks] = useState({});
 
   const tasksCollection = collection(db, 'tasks');
+  // For-routhing
+  const [user, setUser] = useState(null);
+  const router = useRouter();
 
-  // 🔽 Fetch tasks from Firestore on load
   useEffect(() => {
-    const fetchTasks = async () => {
-      const snapshot = await getDocs(tasksCollection);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        router.push('/login');
+      } else {
+        setUser(currentUser);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  // 🔁 Real-time Firestore sync
+  useEffect(() => {
+    const unsubscribe = onSnapshot(tasksCollection, (snapshot) => {
       const fetchedTasks = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       setTasks(fetchedTasks);
-    };
-    fetchTasks();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const syncTaskToFirestore = async (task) => {
@@ -37,9 +60,12 @@ function Usersection() {
 
   const addTask = async () => {
     if (!taskInput.trim()) return;
-    const newTask = { text: taskInput, subtasks: [] };
-    const docRef = await addDoc(tasksCollection, newTask);
-    setTasks([...tasks, { ...newTask, id: docRef.id }]);
+    const newTask = {
+      text: taskInput,
+      subtasks: [],
+      createdAt: serverTimestamp()
+    };
+    await addDoc(tasksCollection, newTask);
     setTaskInput('');
   };
 
@@ -92,6 +118,8 @@ function Usersection() {
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-indigo-500 via-blue-600 to-purple-600 text-white px-4 py-10">
+  
+    {/* Working-view */}
       <div className="max-w-3xl mx-auto bg-white/10 rounded-2xl p-6 shadow-xl">
         <h1 className="text-4xl font-bold text-center mb-8">📋 To-Do Tracker</h1>
 
@@ -210,6 +238,19 @@ function Usersection() {
           <p className="text-center text-white/70 mt-10">No tasks found.</p>
         )}
       </div>
+        {/* Login-data */}
+    <div className="bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 text-white flex flex-col items-center justify-center p-5 rounded-xl">
+      <h1 className="text-4xl font-bold mb-4">Welcome, {user?.displayName || "User"}!</h1>
+      <button
+        onClick={handleLogout}
+        className="bg-white text-indigo-700 px-6 py-2 rounded-md font-semibold hover:bg-indigo-100 transition"
+      >
+        Logout
+      </button>
+
+      {/* Your task tracker or UI here below */}
+      {/* Example: <Usersection /> or your task component */}
+    </div>
     </div>
   );
 }
