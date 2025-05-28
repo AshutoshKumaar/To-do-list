@@ -1,7 +1,11 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-
+import { db } from '../firebase/config';
+import {
+  collection, addDoc, getDocs, updateDoc,
+  deleteDoc, doc, setDoc
+} from 'firebase/firestore';
 
 function Usersection() {
   const [tasks, setTasks] = useState([]);
@@ -11,34 +15,61 @@ function Usersection() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTasks, setExpandedTasks] = useState({});
 
-  const addTask = () => {
+  const tasksCollection = collection(db, 'tasks');
+
+  // 🔽 Fetch tasks from Firestore on load
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const snapshot = await getDocs(tasksCollection);
+      const fetchedTasks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTasks(fetchedTasks);
+    };
+    fetchTasks();
+  }, []);
+
+  const syncTaskToFirestore = async (task) => {
+    const docRef = doc(db, 'tasks', task.id);
+    await setDoc(docRef, task);
+  };
+
+  const addTask = async () => {
     if (!taskInput.trim()) return;
-    setTasks([...tasks, { text: taskInput, subtasks: [] }]);
+    const newTask = { text: taskInput, subtasks: [] };
+    const docRef = await addDoc(tasksCollection, newTask);
+    setTasks([...tasks, { ...newTask, id: docRef.id }]);
     setTaskInput('');
   };
 
-  const addSubtask = (index) => {
+  const addSubtask = async (index) => {
     if (!subtaskInput.trim()) return;
     const updated = [...tasks];
-    updated[index].subtasks.push({ text: subtaskInput, done: false });
+    const newSub = { text: subtaskInput, done: false };
+    updated[index].subtasks.push(newSub);
+    await syncTaskToFirestore(updated[index]);
     setTasks(updated);
     setSubtaskInput('');
   };
 
-  const claimSubtask = (taskIndex, subtaskIndex) => {
+  const claimSubtask = async (taskIndex, subtaskIndex) => {
     const updated = [...tasks];
     updated[taskIndex].subtasks[subtaskIndex].done = true;
+    await syncTaskToFirestore(updated[taskIndex]);
     setTasks(updated);
   };
 
-  const deleteTask = (index) => {
-    const updated = tasks.filter((_, i) => i !== index);
-    setTasks(updated);
+  const deleteTask = async (index) => {
+    const task = tasks[index];
+    await deleteDoc(doc(db, 'tasks', task.id));
+    setTasks(tasks.filter((_, i) => i !== index));
   };
 
-  const deleteSubtask = (taskIndex, subtaskIndex) => {
+  const deleteSubtask = async (taskIndex, subtaskIndex) => {
     const updated = [...tasks];
     updated[taskIndex].subtasks = updated[taskIndex].subtasks.filter((_, i) => i !== subtaskIndex);
+    await syncTaskToFirestore(updated[taskIndex]);
     setTasks(updated);
   };
 
@@ -49,9 +80,9 @@ function Usersection() {
   };
 
   const toggleSubtasks = (index) => {
-    setExpandedTasks((prev) => ({
+    setExpandedTasks(prev => ({
       ...prev,
-      [index]: !prev[index],
+      [index]: !prev[index]
     }));
   };
 
@@ -60,87 +91,74 @@ function Usersection() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-indigo-500 via-blue-600 to-purple-600 text-white px-4 py-10 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl">
-        <h1 className="text-4xl font-bold text-center mb-8 drop-shadow-sm">📋 To-Do Tracker</h1>
+    <div className="min-h-screen bg-gradient-to-tr from-indigo-500 via-blue-600 to-purple-600 text-white px-4 py-10">
+      <div className="max-w-3xl mx-auto bg-white/10 rounded-2xl p-6 shadow-xl">
+        <h1 className="text-4xl font-bold text-center mb-8">📋 To-Do Tracker</h1>
 
-        {/* Add Task Input */}
+        {/* Input Section */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <input
             type="text"
             value={taskInput}
             onChange={(e) => setTaskInput(e.target.value)}
             placeholder="Type your main task..."
-            className="flex-1 px-4 py-2 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 transition"
+            className="flex-1 px-4 py-2 rounded-md bg-white/10 text-white placeholder-white/70 border border-white/30"
           />
           <button
             onClick={addTask}
-            className="bg-cyan-300 hover:bg-cyan-400 text-blue-900 font-medium px-4 py-2 rounded-md transition shadow-md"
+            className="bg-cyan-300 hover:bg-cyan-400 text-blue-900 font-medium px-4 py-2 rounded-md"
           >
             Add Task
           </button>
         </div>
 
-        {/* Search Tasks */}
-        <div className="mb-6">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks..."
-            className="w-full px-4 py-2 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-pink-300 transition"
-          />
-        </div>
+        {/* Search */}
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search tasks..."
+          className="w-full px-4 py-2 mb-6 rounded-md bg-white/10 text-white border border-white/30"
+        />
 
-        {/* Task List */}
-        {filteredTasks.length > 0 ? (
+        {/* Tasks */}
+        {filteredTasks.length ? (
           <ul className="space-y-6">
             {filteredTasks.map((task, index) => (
-              <li key={index} className="bg-white/20 rounded-xl p-5 shadow-md">
+              <li key={task.id} className="bg-white/20 rounded-xl p-5">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h2 className="text-lg sm:text-xl font-semibold mb-2 capitalize">{task.text}</h2>
+                    <h2 className="text-xl font-semibold capitalize">{task.text}</h2>
                     <button
-                      onClick={() => deleteTask(tasks.indexOf(task))}
+                      onClick={() => deleteTask(index)}
                       className="text-red-300 hover:text-red-500 text-sm"
                     >
                       Delete
                     </button>
                   </div>
-                  <button
-                    onClick={() => toggleSubtasks(index)}
-                    className={`text-white text-xl transition-transform duration-300`}
-                  >
-                   {
-                    expandedTasks[index] ? <FaEyeSlash className='duration-300 ease-in-out' /> : <FaEye  className='duration-300 ease-in-out' /> 
-                   }
+                  <button onClick={() => toggleSubtasks(index)}>
+                    {expandedTasks[index] ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
 
-                {/* Subtask Section (conditionally shown) */}
+                {/* Subtasks */}
                 {expandedTasks[index] && (
                   <>
-                    {/* Subtasks */}
                     <ul className="space-y-2 ml-3">
                       {task.subtasks.map((sub, subIndex) => (
-                        <li
-                          key={subIndex}
-                          className="flex justify-between items-center text-sm"
-                        >
-                          <span className={`capitalize ${sub.done ? 'underline text-slate-100' : ''}`}>
-                            {sub.text}
-                          </span>
+                        <li key={subIndex} className="flex justify-between text-sm">
+                          <span className={`${sub.done ? 'underline text-slate-100' : ''}`}>{sub.text}</span>
                           <div className="space-x-2">
                             {!sub.done && (
                               <button
-                                onClick={() => claimSubtask(tasks.indexOf(task), subIndex)}
-                                className="bg-green-400 hover:bg-green-500 text-xs px-2 py-1 rounded-md transition"
+                                onClick={() => claimSubtask(index, subIndex)}
+                                className="bg-green-400 hover:bg-green-500 text-xs px-2 py-1 rounded"
                               >
                                 Claim
                               </button>
                             )}
                             <button
-                              onClick={() => deleteSubtask(tasks.indexOf(task), subIndex)}
+                              onClick={() => deleteSubtask(index, subIndex)}
                               className="text-red-200 text-xs hover:text-red-400"
                             >
                               Delete
@@ -151,34 +169,34 @@ function Usersection() {
                     </ul>
 
                     {/* Add Subtask */}
-                    <div className="flex flex-col sm:flex-row mt-4 gap-2 text-sm">
+                    <div className="flex mt-4 gap-2 text-sm">
                       <input
                         type="text"
-                        value={selectedTaskIndex === tasks.indexOf(task) ? subtaskInput : ''}
+                        value={selectedTaskIndex === index ? subtaskInput : ''}
                         onChange={(e) => {
-                          setSelectedTaskIndex(tasks.indexOf(task));
+                          setSelectedTaskIndex(index);
                           setSubtaskInput(e.target.value);
                         }}
                         placeholder="Type a subtask..."
-                        className="flex-1 px-3 py-1.5 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+                        className="flex-1 px-3 py-2 rounded-md bg-white/10 text-white border border-white/30"
                       />
                       <button
-                        onClick={() => addSubtask(tasks.indexOf(task))}
-                        className="bg-white text-indigo-800 text-xs font-medium px-3 py-1.5 rounded-md hover:bg-gray-100 transition shadow-sm"
+                        onClick={() => addSubtask(index)}
+                        className="bg-white text-indigo-800 px-3 py-2 rounded-md"
                       >
                         Add
                       </button>
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* Progress */}
                     <div className="mt-5">
-                      <label className="text-sm font-light">Progress</label>
+                      <label className="text-sm">Progress</label>
                       <div className="relative w-full bg-white/30 rounded-full h-4 mt-1">
                         <div
                           className="bg-lime-400 h-4 rounded-full transition-all duration-300"
                           style={{ width: `${getProgress(task)}%` }}
-                        ></div>
-                        <span className="absolute right-3 top-0.5 text-xs text-white font-light">
+                        />
+                        <span className="absolute right-3 top-0.5 text-xs">
                           {getProgress(task)}% done
                         </span>
                       </div>
@@ -189,7 +207,7 @@ function Usersection() {
             ))}
           </ul>
         ) : (
-          <p className="text-center text-sm text-white/70 mt-10">No tasks found.</p>
+          <p className="text-center text-white/70 mt-10">No tasks found.</p>
         )}
       </div>
     </div>
